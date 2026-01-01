@@ -3,9 +3,15 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"main": "electron/main.js",
 	"scripts": {
-		"dev": "vite dev",
-		"build": "vite build",
+		"dev:svelte": "vite dev",
+		"dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
+		"dev": "concurrently \"npm:dev:svelte\" \"npm:dev:electron\"",
+		"build": "vite build && electron-builder",
+		"build:win": "vite build && electron-builder --win",
+		"build:mac": "vite build && electron-builder --mac",
+		"build:linux": "vite build && electron-builder --linux",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -18,10 +24,15 @@
 		"@eslint/compat": "^1.4.0",
 		"@eslint/js": "^9.39.1",
 		"@sveltejs/adapter-auto": "^7.0.0",
+		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.49.1",
 		"@sveltejs/vite-plugin-svelte": "^6.2.1",
 		"@types/node": "^24",
 		"@vitest/browser-playwright": "^4.0.15",
+		"concurrently": "^9.2.1",
+		"cross-env": "^10.1.0",
+		"electron": "^39.2.7",
+		"electron-builder": "^26.0.12",
 		"eslint": "^9.39.1",
 		"eslint-plugin-svelte": "^3.13.1",
 		"globals": "^16.5.0",
@@ -32,6 +43,7 @@
 		"typescript-eslint": "^8.48.1",
 		"vite": "^7.2.6",
 		"vitest": "^4.0.15",
-		"vitest-browser-svelte": "^2.0.1"
+		"vitest-browser-svelte": "^2.0.1",
+		"wait-on": "^9.0.3"
 	}
 }

@@ -1,0 +1,27 @@
+{
+  "appId": "com.releasetracker.app",
+  "productName": "Release Tracker",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "build/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": ["dir"],
+    "signAndEditExecutable": false,
+    "verifyUpdateCodeSignature": false
+  },
+  "mac": {
+    "target": ["dmg"],
+    "icon": "build/icon.icns",
+    "category": "public.app-category.developer-tools"
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "icon": "build/icon.png",
+    "category": "Development"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run dev:svelte:*)",
+      "Bash(npm run build:win:*)",
+      "Bash(dir \"C:\\\\Users\\\\Usuario\\\\stuff\\\\code\\\\releasetracker\\\\build\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\Usuario\\\\stuff\\\\code\\\\releasetracker\\\\build\")",
+      "Bash(findstr:*)"
+    ]
+  }
+}
