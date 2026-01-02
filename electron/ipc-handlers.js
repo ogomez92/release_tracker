@@ -2,6 +2,10 @@ import { dialog, app } from 'electron';
 import fs from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 // Get data file path
 function getDataFilePath() {
@@ -673,6 +677,174 @@ async function importData() {
   }
 }
 
+// IPC Handler: Get update folder path from settings
+async function getUpdateFolderPath() {
+  const settings = await loadSettings();
+  return settings.updateFolderPath || null;
+}
+
+// IPC Handler: Save update folder path to settings
+async function saveUpdateFolderPath(event, folderPath) {
+  const settings = await loadSettings();
+  settings.updateFolderPath = folderPath;
+  await saveSettings(settings);
+}
+
+// IPC Handler: Check for uncommitted changes in a repo
+async function checkUncommittedChanges(event, repoPath) {
+  try {
+    const { stdout } = await execAsync('git status --porcelain', { cwd: repoPath });
+    return {
+      hasChanges: stdout.trim().length > 0,
+      changes: stdout.trim()
+    };
+  } catch (err) {
+    const stderr = err.stderr || '';
+    const message = stderr.trim() || err.message || 'Failed to check git status';
+    throw new Error(message);
+  }
+}
+
+// IPC Handler: Get default branch name for a repo
+async function getDefaultBranch(event, repoPath) {
+  try {
+    // Try to get the default branch from origin/HEAD
+    const { stdout } = await execAsync(
+      'git symbolic-ref refs/remotes/origin/HEAD',
+      { cwd: repoPath }
+    );
+    // Output is like "refs/remotes/origin/main" - extract branch name
+    const match = stdout.trim().match(/refs\/remotes\/origin\/(.+)/);
+    if (match) {
+      return match[1];
+    }
+  } catch {
+    // symbolic-ref failed, try fallback methods
+  }
+
+  // Fallback: try common branch names
+  try {
+    await execAsync('git rev-parse --verify origin/main', { cwd: repoPath });
+    return 'main';
+  } catch {
+    // main doesn't exist
+  }
+
+  try {
+    await execAsync('git rev-parse --verify origin/master', { cwd: repoPath });
+    return 'master';
+  } catch {
+    // master doesn't exist either
+  }
+
+  throw new Error('Could not determine default branch');
+}
+
+// IPC Handler: Checkout to a specific branch
+async function checkoutBranch(event, repoPath, branchName) {
+  try {
+    await execAsync(`git checkout ${branchName}`, { cwd: repoPath });
+    return { success: true };
+  } catch (err) {
+    const stderr = err.stderr || '';
+    const message = stderr.trim() || err.message || `Failed to checkout ${branchName}`;
+    throw new Error(message);
+  }
+}
+
+// IPC Handler: Pull updates from remote
+async function pullUpdates(event, repoPath) {
+  try {
+    const { stdout, stderr } = await execAsync('git pull', {
+      cwd: repoPath,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+    });
+    const output = stdout.trim() || stderr.trim();
+    return {
+      success: true,
+      output: output,
+      upToDate: output.includes('Already up to date') || output.includes('Already up-to-date')
+    };
+  } catch (err) {
+    const stderr = err.stderr || '';
+    let message = stderr.trim() || err.message || 'Failed to pull updates';
+
+    // Make auth errors more user-friendly
+    if (message.includes('could not read Username') || message.includes('Authentication failed')) {
+      message = 'Authentication required. Add a GitHub token in Settings.';
+    }
+
+    // Make network errors clearer
+    if (message.includes('Connection was reset') || message.includes('Could not resolve host')) {
+      message = 'Network error: ' + message;
+    }
+
+    throw new Error(message);
+  }
+}
+
+// IPC Handler: Show message box dialog
+async function showMessageBox(event, options) {
+  const result = await dialog.showMessageBox(options);
+  return { response: result.response };
+}
+
+// IPC Handler: Check if a directory exists
+async function directoryExists(event, dirPath) {
+  try {
+    const stats = await fs.stat(dirPath);
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+// IPC Handler: Clone a git repository
+async function cloneRepo(event, repoUrl, targetPath) {
+  try {
+    // Ensure parent directory exists
+    const parentDir = path.dirname(targetPath);
+    await fs.mkdir(parentDir, { recursive: true });
+
+    // Get GitHub token for authenticated cloning (needed for private repos)
+    const token = await getGitHubToken();
+
+    // Build clone URL with token if available
+    let cloneUrl = repoUrl;
+    if (token && repoUrl.includes('github.com')) {
+      // Convert https://github.com/owner/repo to https://token@github.com/owner/repo
+      cloneUrl = repoUrl.replace('https://github.com', `https://${token}@github.com`);
+    }
+
+    // Clone the repository (disable prompts to avoid hanging)
+    const { stdout, stderr } = await execAsync(
+      `git clone "${cloneUrl}" "${targetPath}"`,
+      {
+        cwd: parentDir,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      }
+    );
+    return {
+      success: true,
+      output: stdout.trim() || stderr.trim()
+    };
+  } catch (err) {
+    // Extract the actual git error message from stderr
+    const stderr = err.stderr || '';
+    let message = stderr.trim() || err.message || 'Unknown clone error';
+
+    // Clean up error message - remove "Cloning into..." line
+    message = message.split('\n').filter(line => !line.startsWith('Cloning into')).join('\n').trim();
+
+    // Make auth errors more user-friendly
+    if (message.includes('could not read Username') || message.includes('Authentication failed')) {
+      message = 'Authentication required. Add a GitHub token in Settings for private repos.';
+    }
+
+    throw new Error(message);
+  }
+}
+
 export {
   selectFolder,
   scanFolder,
@@ -688,5 +860,14 @@ export {
   removeGitHubToken,
   getRateLimit,
   exportData,
-  importData
+  importData,
+  getUpdateFolderPath,
+  saveUpdateFolderPath,
+  checkUncommittedChanges,
+  getDefaultBranch,
+  checkoutBranch,
+  pullUpdates,
+  showMessageBox,
+  directoryExists,
+  cloneRepo
 };

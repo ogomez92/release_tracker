@@ -7,7 +7,8 @@
       "Bash(npm run build:win:*)",
       "Bash(dir \"C:\\\\Users\\\\Usuario\\\\stuff\\\\code\\\\releasetracker\\\\build\")",
       "Bash(dir /s /b \"C:\\\\Users\\\\Usuario\\\\stuff\\\\code\\\\releasetracker\\\\build\")",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Skill(superpowers:brainstorming)"
     ]
   }
 }

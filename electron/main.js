@@ -88,6 +88,17 @@ function createWindow() {
   ipcMain.handle('export-data', handlers.exportData);
   ipcMain.handle('import-data', handlers.importData);
 
+  // Update feature handlers
+  ipcMain.handle('get-update-folder-path', handlers.getUpdateFolderPath);
+  ipcMain.handle('save-update-folder-path', handlers.saveUpdateFolderPath);
+  ipcMain.handle('check-uncommitted-changes', handlers.checkUncommittedChanges);
+  ipcMain.handle('get-default-branch', handlers.getDefaultBranch);
+  ipcMain.handle('checkout-branch', handlers.checkoutBranch);
+  ipcMain.handle('pull-updates', handlers.pullUpdates);
+  ipcMain.handle('show-message-box', handlers.showMessageBox);
+  ipcMain.handle('directory-exists', handlers.directoryExists);
+  ipcMain.handle('clone-repo', handlers.cloneRepo);
+
   // Open external links in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://') || url.startsWith('https://')) {

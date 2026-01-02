@@ -45,6 +45,15 @@
 						Settings
 					</a>
 				</li>
+				<li>
+					<a
+						href="/update"
+						aria-current={$page.url.pathname === '/update' ? 'page' : undefined}
+						class:active={$page.url.pathname === '/update'}
+					>
+						Update Repos
+					</a>
+				</li>
 			</ul>
 		</nav>
 	</header>

@@ -28,5 +28,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Data management
   exportData: () => ipcRenderer.invoke('export-data'),
-  importData: () => ipcRenderer.invoke('import-data')
+  importData: () => ipcRenderer.invoke('import-data'),
+
+  // Update feature
+  getUpdateFolderPath: () => ipcRenderer.invoke('get-update-folder-path'),
+  saveUpdateFolderPath: (path) => ipcRenderer.invoke('save-update-folder-path', path),
+  checkUncommittedChanges: (repoPath) => ipcRenderer.invoke('check-uncommitted-changes', repoPath),
+  getDefaultBranch: (repoPath) => ipcRenderer.invoke('get-default-branch', repoPath),
+  checkoutBranch: (repoPath, branch) => ipcRenderer.invoke('checkout-branch', repoPath, branch),
+  pullUpdates: (repoPath) => ipcRenderer.invoke('pull-updates', repoPath),
+  showMessageBox: (options) => ipcRenderer.invoke('show-message-box', options),
+  directoryExists: (dirPath) => ipcRenderer.invoke('directory-exists', dirPath),
+  cloneRepo: (repoUrl, targetPath) => ipcRenderer.invoke('clone-repo', repoUrl, targetPath)
 });

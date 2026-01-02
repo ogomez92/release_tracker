@@ -74,6 +74,50 @@ export interface ImportResult {
 	releaseCount?: number;
 }
 
+// Update feature types
+export type RepoUpdateStatus = 'pending' | 'checking' | 'cloning' | 'pulling' | 'done' | 'error' | 'skipped';
+
+export interface RepoUpdateState {
+	repoPath: string;
+	repoName: string;
+	status: RepoUpdateStatus;
+	message?: string;
+	error?: string;
+	hasUncommittedChanges?: boolean;
+	upToDate?: boolean;
+}
+
+export interface UncommittedChangesResult {
+	hasChanges: boolean;
+	changes: string;
+}
+
+export interface CheckoutResult {
+	success: boolean;
+}
+
+export interface PullResult {
+	success: boolean;
+	output: string;
+	upToDate: boolean;
+}
+
+export interface MessageBoxOptions {
+	type: 'none' | 'info' | 'error' | 'question' | 'warning';
+	message: string;
+	title: string;
+	buttons: string[];
+}
+
+export interface MessageBoxResult {
+	response: number;
+}
+
+export interface CloneResult {
+	success: boolean;
+	output: string;
+}
+
 // Electron API exposed via preload script
 export interface ElectronAPI {
 	selectFolder: () => Promise<string | null>;
@@ -91,6 +135,16 @@ export interface ElectronAPI {
 	getRateLimit: () => Promise<RateLimit>;
 	exportData: () => Promise<ExportResult>;
 	importData: () => Promise<ImportResult>;
+	// Update feature methods
+	getUpdateFolderPath: () => Promise<string | null>;
+	saveUpdateFolderPath: (path: string) => Promise<void>;
+	checkUncommittedChanges: (repoPath: string) => Promise<UncommittedChangesResult>;
+	getDefaultBranch: (repoPath: string) => Promise<string>;
+	checkoutBranch: (repoPath: string, branch: string) => Promise<CheckoutResult>;
+	pullUpdates: (repoPath: string) => Promise<PullResult>;
+	showMessageBox: (options: MessageBoxOptions) => Promise<MessageBoxResult>;
+	directoryExists: (dirPath: string) => Promise<boolean>;
+	cloneRepo: (repoUrl: string, targetPath: string) => Promise<CloneResult>;
 }
 
 // Global window interface extension for TypeScript
