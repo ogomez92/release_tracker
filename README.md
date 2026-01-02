@@ -1,38 +1,86 @@
-# sv
+# Release Tracker
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A desktop application to monitor GitHub releases and commits across all your repositories in one place.
 
-## Creating a project
+![Electron](https://img.shields.io/badge/Electron-39-47848F?logo=electron&logoColor=white)
+![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Features
 
-```sh
-# create a new project in the current directory
-npx sv create
+- **Track Multiple Repositories** - Add repos by scanning local folders or entering GitHub URLs manually
+- **View Latest Releases** - See release notes, tags, and dates for all tracked repositories
+- **Commit Tracking** - For repos without releases, view the latest commit information
+- **Clone & Update** - Clone missing repositories or pull updates with one click
+- **GitHub API Integration** - Efficient GraphQL queries with rate limit monitoring
+- **Export/Import Data** - Backup and migrate your tracking data as JSON
+- **Cross-Platform** - Works on Windows, macOS, and Linux
 
-# create a new project in my-app
-npx sv create my-app
-```
+## Installation
 
-## Developing
+### Download
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Download the latest release for your platform from the [Releases](../../releases) page.
 
-```sh
+### Build from Source
+
+**Prerequisites:** Node.js 18+, Git
+
+```bash
+# Clone the repository
+git clone https://github.com/ogomez92/releasetracker.git
+cd release_tracker
+
+# Install dependencies
+npm install
+
+# Run in development mode
 npm run dev
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+# Build for your platform
+npm run build:win    # Windows
+npm run build:mac    # macOS
+npm run build:linux  # Linux
 ```
 
-## Building
+## Usage
 
-To create a production version of your app:
+### Adding Repositories
 
-```sh
-npm run build
-```
+**From folders:** Click "Add from Folder" and select a directory. The app will scan for all Git repositories within.
 
-You can preview the production build with `npm run preview`.
+**Manually:** Click "Add Manual" and enter the GitHub owner and repository name (e.g., `microsoft/vscode`).
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+### Viewing Releases
+
+Navigate to the Releases page to see the latest releases from all tracked repositories. Repositories without releases will show their latest commit instead.
+
+### Updating Repositories
+
+The Update page lets you clone missing repositories or pull the latest changes. Select a base folder where repos will be organized as `owner/repo-name`.
+
+### Settings
+
+- **GitHub Token** - Add a personal access token for higher API rate limits (60 → 5,000 requests/hour) and access to private repositories
+- **Rate Limit** - Check your current GitHub API rate limit status
+- **Export/Import** - Backup your tracked repositories and settings
+
+## Configuration
+
+### GitHub Token (Optional)
+
+For increased rate limits and private repo access, [create a personal access token](https://github.com/settings/tokens) with `repo` scope and add it in Settings.
+
+### Data Storage
+
+All data is stored locally:
+
+| Platform | Location |
+|----------|----------|
+| Windows | `%APPDATA%\releasetracker\` |
+| macOS | `~/Library/Application Support/releasetracker/` |
+| Linux | `~/.config/releasetracker/` |
+
+## License
+
+MIT
