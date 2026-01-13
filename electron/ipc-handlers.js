@@ -752,6 +752,18 @@ async function checkoutBranch(event, repoPath, branchName) {
   }
 }
 
+// IPC Handler: Discard all uncommitted changes in a repo
+async function discardChanges(event, repoPath) {
+  try {
+    await execAsync('git checkout .', { cwd: repoPath });
+    return { success: true };
+  } catch (err) {
+    const stderr = err.stderr || '';
+    const message = stderr.trim() || err.message || 'Failed to discard changes';
+    throw new Error(message);
+  }
+}
+
 // IPC Handler: Pull updates from remote
 async function pullUpdates(event, repoPath) {
   try {
@@ -866,6 +878,7 @@ export {
   checkUncommittedChanges,
   getDefaultBranch,
   checkoutBranch,
+  discardChanges,
   pullUpdates,
   showMessageBox,
   directoryExists,

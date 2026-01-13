@@ -94,6 +94,7 @@ function createWindow() {
   ipcMain.handle('check-uncommitted-changes', handlers.checkUncommittedChanges);
   ipcMain.handle('get-default-branch', handlers.getDefaultBranch);
   ipcMain.handle('checkout-branch', handlers.checkoutBranch);
+  ipcMain.handle('discard-changes', handlers.discardChanges);
   ipcMain.handle('pull-updates', handlers.pullUpdates);
   ipcMain.handle('show-message-box', handlers.showMessageBox);
   ipcMain.handle('directory-exists', handlers.directoryExists);

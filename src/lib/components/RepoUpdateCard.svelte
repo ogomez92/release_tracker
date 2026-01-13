@@ -1,10 +1,52 @@
 <script lang="ts">
 	import type { RepoUpdateState } from '$lib/types';
 
-	let { state }: { state: RepoUpdateState } = $props();
+	let {
+		repoState,
+		onStateChange
+	}: { repoState: RepoUpdateState; onStateChange?: (newState: RepoUpdateState) => void } = $props();
+
+	let recovering = $state(false);
+
+	async function handleDiscardAndPull() {
+		if (!onStateChange) return;
+
+		recovering = true;
+
+		try {
+			// Discard uncommitted changes
+			await window.electronAPI.discardChanges(repoState.repoPath);
+
+			// Get default branch
+			const defaultBranch = await window.electronAPI.getDefaultBranch(repoState.repoPath);
+
+			// Checkout to default branch
+			await window.electronAPI.checkoutBranch(repoState.repoPath, defaultBranch);
+
+			// Pull updates
+			const pullResult = await window.electronAPI.pullUpdates(repoState.repoPath);
+
+			// Update state to done
+			onStateChange({
+				...repoState,
+				status: 'done',
+				hasUncommittedChanges: false,
+				upToDate: pullResult.upToDate,
+				message: pullResult.upToDate ? 'Already up to date' : 'Updated successfully'
+			});
+		} catch (err) {
+			onStateChange({
+				...repoState,
+				status: 'error',
+				error: err instanceof Error ? err.message : 'Failed to recover'
+			});
+		} finally {
+			recovering = false;
+		}
+	}
 
 	let statusLabel = $derived(() => {
-		switch (state.status) {
+		switch (repoState.status) {
 			case 'pending':
 				return 'Waiting...';
 			case 'checking':
@@ -14,7 +56,7 @@
 			case 'pulling':
 				return 'Pulling updates...';
 			case 'done':
-				return state.upToDate ? 'Already up to date' : 'Updated successfully';
+				return repoState.upToDate ? 'Already up to date' : 'Updated successfully';
 			case 'error':
 				return 'Error';
 			case 'skipped':
@@ -25,7 +67,7 @@
 	});
 
 	let statusClass = $derived(() => {
-		switch (state.status) {
+		switch (repoState.status) {
 			case 'pending':
 				return 'status-pending';
 			case 'checking':
@@ -46,17 +88,17 @@
 	});
 
 	let isActive = $derived(
-		state.status === 'checking' || state.status === 'cloning' || state.status === 'pulling'
+		repoState.status === 'checking' || repoState.status === 'cloning' || repoState.status === 'pulling'
 	);
 </script>
 
 <article
 	class="update-card {statusClass()}"
-	aria-live={state.status === 'error' ? 'assertive' : 'polite'}
+	aria-live={repoState.status === 'error' ? 'assertive' : 'polite'}
 	aria-atomic="true"
 >
 	<div class="card-header">
-		<h3 class="repo-name">{state.repoName}</h3>
+		<h3 class="repo-name">{repoState.repoName}</h3>
 		<span class="status-badge" class:active={isActive}>
 			{#if isActive}
 				<span class="spinner"></span>
@@ -65,14 +107,25 @@
 		</span>
 	</div>
 
-	<p class="repo-path">{state.repoPath}</p>
+	<p class="repo-path">{repoState.repoPath}</p>
 
-	{#if state.message}
-		<p class="message">{state.message}</p>
+	{#if repoState.message}
+		<p class="message">{repoState.message}</p>
 	{/if}
 
-	{#if state.error}
-		<p class="error-message" role="alert">{state.error}</p>
+	{#if repoState.error}
+		<p class="error-message" role="alert">{repoState.error}</p>
+	{/if}
+
+	{#if repoState.status === 'skipped' && repoState.hasUncommittedChanges}
+		<button class="discard-btn" onclick={handleDiscardAndPull} disabled={recovering}>
+			{#if recovering}
+				<span class="spinner"></span>
+				Updating...
+			{:else}
+				Discard changes & pull
+			{/if}
+		</button>
 	{/if}
 </article>
 
@@ -193,5 +246,30 @@
 	.status-skipped .status-badge {
 		background-color: var(--color-warning, #d97706);
 		color: white;
+	}
+
+	.discard-btn {
+		margin-top: var(--spacing-sm);
+		padding: var(--spacing-xs) var(--spacing-sm);
+		font-size: var(--font-size-sm);
+		font-weight: 500;
+		color: white;
+		background-color: var(--color-warning, #d97706);
+		border: none;
+		border-radius: var(--border-radius);
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		gap: var(--spacing-xs);
+		transition: background-color 0.2s;
+	}
+
+	.discard-btn:hover:not(:disabled) {
+		background-color: var(--color-warning-hover, #b45309);
+	}
+
+	.discard-btn:disabled {
+		opacity: 0.7;
+		cursor: not-allowed;
 	}
 </style>

@@ -308,8 +308,13 @@
 			{/if}
 
 			<div class="repo-grid">
-				{#each repoStates as state (state.repoPath)}
-					<RepoUpdateCard {state} />
+				{#each repoStates as repoState, index (repoState.repoPath)}
+					<RepoUpdateCard
+						{repoState}
+						onStateChange={(newState) => {
+							repoStates[index] = newState;
+						}}
+					/>
 				{/each}
 			</div>
 		</section>

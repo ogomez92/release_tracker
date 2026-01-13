@@ -141,6 +141,7 @@ export interface ElectronAPI {
 	checkUncommittedChanges: (repoPath: string) => Promise<UncommittedChangesResult>;
 	getDefaultBranch: (repoPath: string) => Promise<string>;
 	checkoutBranch: (repoPath: string, branch: string) => Promise<CheckoutResult>;
+	discardChanges: (repoPath: string) => Promise<CheckoutResult>;
 	pullUpdates: (repoPath: string) => Promise<PullResult>;
 	showMessageBox: (options: MessageBoxOptions) => Promise<MessageBoxResult>;
 	directoryExists: (dirPath: string) => Promise<boolean>;

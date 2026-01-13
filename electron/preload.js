@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkUncommittedChanges: (repoPath) => ipcRenderer.invoke('check-uncommitted-changes', repoPath),
   getDefaultBranch: (repoPath) => ipcRenderer.invoke('get-default-branch', repoPath),
   checkoutBranch: (repoPath, branch) => ipcRenderer.invoke('checkout-branch', repoPath, branch),
+  discardChanges: (repoPath) => ipcRenderer.invoke('discard-changes', repoPath),
   pullUpdates: (repoPath) => ipcRenderer.invoke('pull-updates', repoPath),
   showMessageBox: (options) => ipcRenderer.invoke('show-message-box', options),
   directoryExists: (dirPath) => ipcRenderer.invoke('directory-exists', dirPath),
