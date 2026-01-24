@@ -40,5 +40,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pullUpdates: (repoPath) => ipcRenderer.invoke('pull-updates', repoPath),
   showMessageBox: (options) => ipcRenderer.invoke('show-message-box', options),
   directoryExists: (dirPath) => ipcRenderer.invoke('directory-exists', dirPath),
-  cloneRepo: (repoUrl, targetPath) => ipcRenderer.invoke('clone-repo', repoUrl, targetPath)
+  cloneRepo: (repoUrl, targetPath) => ipcRenderer.invoke('clone-repo', repoUrl, targetPath),
+
+  // Add by username/URL
+  fetchUserRepos: (username) => ipcRenderer.invoke('fetch-user-repos', username),
+  fetchReposFromUrl: (url) => ipcRenderer.invoke('fetch-repos-from-url', url)
 });

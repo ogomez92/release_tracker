@@ -857,6 +857,127 @@ async function cloneRepo(event, repoUrl, targetPath) {
   }
 }
 
+// IPC Handler: Fetch all repos for a GitHub user
+async function fetchUserRepos(event, username) {
+  try {
+    const token = await getGitHubToken();
+    const repos = [];
+    let page = 1;
+    const perPage = 100;
+
+    while (true) {
+      const response = await fetch(
+        `https://api.github.com/users/${encodeURIComponent(username)}/repos?per_page=${perPage}&page=${page}&sort=updated`,
+        {
+          headers: {
+            'User-Agent': 'ReleaseTracker-App',
+            'Accept': 'application/vnd.github+json',
+            ...(token && { 'Authorization': `Bearer ${token}` })
+          }
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(`User "${username}" not found`);
+        } else if (response.status === 401) {
+          throw new Error('GitHub API authentication failed. Check your GitHub token.');
+        } else if (response.status === 403) {
+          throw new Error('GitHub API rate limit exceeded');
+        }
+        throw new Error(`GitHub API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.length === 0) {
+        break;
+      }
+
+      for (const repo of data) {
+        repos.push({
+          owner: repo.owner.login,
+          name: repo.name,
+          url: repo.html_url,
+          description: repo.description || '',
+          isPrivate: repo.private
+        });
+      }
+
+      // If we got less than perPage, we've reached the end
+      if (data.length < perPage) {
+        break;
+      }
+
+      page++;
+    }
+
+    return repos;
+  } catch (err) {
+    console.error(`Error fetching repos for user ${username}:`, err);
+    throw err;
+  }
+}
+
+// IPC Handler: Fetch repos from a URL by parsing GitHub links
+async function fetchReposFromUrl(event, url) {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'ReleaseTracker-App'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL: ${response.statusText}`);
+    }
+
+    const text = await response.text();
+
+    // Find all GitHub repo URLs in the content
+    const repoPattern = /https?:\/\/github\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/g;
+    const found = new Map(); // Use Map to deduplicate by owner/name
+
+    let match;
+    while ((match = repoPattern.exec(text)) !== null) {
+      const owner = match[1];
+      let name = match[2];
+
+      // Skip GitHub special paths
+      if (['topics', 'trending', 'collections', 'sponsors', 'orgs', 'settings', 'marketplace', 'explore', 'notifications', 'issues', 'pulls', 'stars'].includes(owner)) {
+        continue;
+      }
+
+      // Skip if name looks like a special path (contains certain patterns)
+      if (['issues', 'pulls', 'releases', 'actions', 'projects', 'wiki', 'settings', 'blob', 'tree', 'commit', 'commits', 'branches', 'tags'].includes(name)) {
+        continue;
+      }
+
+      // Clean up name - remove trailing slashes, .git, etc.
+      name = name.replace(/\.git$/, '').replace(/\/$/, '');
+
+      // Skip empty names
+      if (!name) {
+        continue;
+      }
+
+      const key = `${owner}/${name}`.toLowerCase();
+      if (!found.has(key)) {
+        found.set(key, {
+          owner,
+          name,
+          url: `https://github.com/${owner}/${name}`
+        });
+      }
+    }
+
+    return Array.from(found.values());
+  } catch (err) {
+    console.error(`Error fetching repos from URL ${url}:`, err);
+    throw err;
+  }
+}
+
 export {
   selectFolder,
   scanFolder,
@@ -882,5 +1003,7 @@ export {
   pullUpdates,
   showMessageBox,
   directoryExists,
-  cloneRepo
+  cloneRepo,
+  fetchUserRepos,
+  fetchReposFromUrl
 };

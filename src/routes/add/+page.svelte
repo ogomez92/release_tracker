@@ -2,6 +2,8 @@
 	import { releasesStore } from '$lib/stores/releases.svelte';
 	import AddFolder from '$lib/components/AddFolder.svelte';
 	import AddManual from '$lib/components/AddManual.svelte';
+	import AddByUsername from '$lib/components/AddByUsername.svelte';
+	import AddByUrl from '$lib/components/AddByUrl.svelte';
 	import { onMount } from 'svelte';
 
 	onMount(() => {
@@ -65,6 +67,8 @@
 <div class="add-methods">
 	<AddFolder />
 	<AddManual />
+	<AddByUsername />
+	<AddByUrl />
 </div>
 
 <style>

@@ -99,6 +99,8 @@ function createWindow() {
   ipcMain.handle('show-message-box', handlers.showMessageBox);
   ipcMain.handle('directory-exists', handlers.directoryExists);
   ipcMain.handle('clone-repo', handlers.cloneRepo);
+  ipcMain.handle('fetch-user-repos', handlers.fetchUserRepos);
+  ipcMain.handle('fetch-repos-from-url', handlers.fetchReposFromUrl);
 
   // Open external links in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

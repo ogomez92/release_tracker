@@ -118,6 +118,22 @@ export interface CloneResult {
 	output: string;
 }
 
+// GitHub user repo (from API)
+export interface GitHubUserRepo {
+	owner: string;
+	name: string;
+	url: string;
+	description: string;
+	isPrivate: boolean;
+}
+
+// Parsed repo from URL
+export interface ParsedRepo {
+	owner: string;
+	name: string;
+	url: string;
+}
+
 // Electron API exposed via preload script
 export interface ElectronAPI {
 	selectFolder: () => Promise<string | null>;
@@ -146,6 +162,9 @@ export interface ElectronAPI {
 	showMessageBox: (options: MessageBoxOptions) => Promise<MessageBoxResult>;
 	directoryExists: (dirPath: string) => Promise<boolean>;
 	cloneRepo: (repoUrl: string, targetPath: string) => Promise<CloneResult>;
+	// Add by username/URL methods
+	fetchUserRepos: (username: string) => Promise<GitHubUserRepo[]>;
+	fetchReposFromUrl: (url: string) => Promise<ParsedRepo[]>;
 }
 
 // Global window interface extension for TypeScript
