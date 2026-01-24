@@ -8,7 +8,13 @@
       "Bash(dir \"C:\\\\Users\\\\Usuario\\\\stuff\\\\code\\\\releasetracker\\\\build\")",
       "Bash(dir /s /b \"C:\\\\Users\\\\Usuario\\\\stuff\\\\code\\\\releasetracker\\\\build\")",
       "Bash(findstr:*)",
-      "Skill(superpowers:brainstorming)"
+      "Skill(superpowers:brainstorming)",
+      "Bash(git show:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(npm run build:*)",
+      "Bash(git add:*)"
     ]
   }
 }
