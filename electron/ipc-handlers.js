@@ -265,149 +265,139 @@ async function fetchReleases() {
   const newCommits = [];
 
   try {
-    // Build GraphQL query to fetch all repos in a single request
-    // Fetch both releases and commits for each repo
-    const repoQueries = data.repos.map((repo, index) => {
-      return `
-        repo${index}: repository(owner: "${repo.owner}", name: "${repo.name}") {
-          latestRelease {
-            id
-            tagName
-            name
-            publishedAt
-            url
-            description
-          }
-          defaultBranchRef {
-            target {
-              ... on Commit {
-                oid
-                message
-                committedDate
-                author {
-                  name
+    const token = await getGitHubToken();
+    const BATCH_SIZE = 30;
+
+    // Split repos into batches to avoid GitHub 502 errors on large queries
+    for (let batchStart = 0; batchStart < data.repos.length; batchStart += BATCH_SIZE) {
+      const batchRepos = data.repos.slice(batchStart, batchStart + BATCH_SIZE);
+
+      const repoQueries = batchRepos.map((repo, index) => {
+        return `
+          repo${index}: repository(owner: "${repo.owner}", name: "${repo.name}") {
+            latestRelease {
+              id
+              tagName
+              name
+              publishedAt
+              url
+              description
+            }
+            defaultBranchRef {
+              target {
+                ... on Commit {
+                  oid
+                  message
+                  committedDate
+                  author {
+                    name
+                  }
+                  url
                 }
-                url
               }
             }
           }
+        `;
+      }).join('\n');
+
+      const query = `
+        query {
+          ${repoQueries}
         }
       `;
-    }).join('\n');
 
-    const query = `
-      query {
-        ${repoQueries}
-      }
-    `;
+      const response = await fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'ReleaseTracker-App',
+          ...(token && { 'Authorization': `bearer ${token}` })
+        },
+        body: JSON.stringify({ query })
+      });
 
-    // Get GitHub token from settings or environment
-    const token = await getGitHubToken();
-
-    const response = await fetch('https://api.github.com/graphql', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'ReleaseTracker-App',
-        // Use stored token or environment variable
-        ...(token && { 'Authorization': `bearer ${token}` })
-      },
-      body: JSON.stringify({ query })
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('GitHub API authentication failed. Check your GITHUB_TOKEN.');
-      } else if (response.status === 403) {
-        throw new Error('GitHub API rate limit exceeded');
-      }
-      throw new Error(`GitHub API error: ${response.statusText}`);
-    }
-
-    const result = await response.json();
-
-    // Check for GraphQL errors
-    if (result.errors) {
-      console.error('GraphQL errors:', result.errors);
-      throw new Error(result.errors[0]?.message || 'GraphQL query failed');
-    }
-
-    // Process each repository's release and commit
-    data.repos.forEach((repo, index) => {
-      const repoData = result.data[`repo${index}`];
-
-      // Skip if repo wasn't found
-      if (!repoData) {
-        console.log(`Repository not found: ${repo.owner}/${repo.name}`);
-        return;
-      }
-
-      // Process release if available
-      if (repoData.latestRelease) {
-        const release = repoData.latestRelease;
-
-        // Create release object
-        const releaseData = {
-          id: randomUUID(),
-          repoId: repo.id,
-          repoOwner: repo.owner,
-          repoName: repo.name,
-          tagName: release.tagName,
-          name: release.name || release.tagName,
-          publishedAt: release.publishedAt,
-          htmlUrl: release.url,
-          body: release.description || '',
-          fetchedAt: new Date().toISOString()
-        };
-
-        // Check if this release already exists
-        const existingIndex = data.releases.findIndex(
-          (r) => r.repoId === repo.id && r.tagName === release.tagName
-        );
-
-        if (existingIndex >= 0) {
-          // Update existing release
-          data.releases[existingIndex] = releaseData;
-        } else {
-          // Add new release
-          newReleases.push(releaseData);
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('GitHub API authentication failed. Check your GITHUB_TOKEN.');
+        } else if (response.status === 403) {
+          throw new Error('GitHub API rate limit exceeded');
         }
-      } else {
-        console.log(`No releases found for ${repo.owner}/${repo.name}`);
+        throw new Error(`GitHub API error: ${response.statusText}`);
       }
 
-      // Process commit if available (for repos without releases or to update commit data)
-      if (repoData.defaultBranchRef?.target) {
-        const commit = repoData.defaultBranchRef.target;
+      const result = await response.json();
 
-        // Create commit object
-        const commitData = {
-          id: randomUUID(),
-          repoId: repo.id,
-          repoOwner: repo.owner,
-          repoName: repo.name,
-          sha: commit.oid,
-          message: commit.message,
-          date: commit.committedDate,
-          author: commit.author.name,
-          htmlUrl: commit.url,
-          fetchedAt: new Date().toISOString()
-        };
+      if (result.errors) {
+        console.error('GraphQL errors:', result.errors);
+        throw new Error(result.errors[0]?.message || 'GraphQL query failed');
+      }
 
-        // Check if commit for this repo already exists
-        const existingCommitIndex = data.commits.findIndex(
-          (c) => c.repoId === repo.id
-        );
+      // Process each repository's release and commit in this batch
+      batchRepos.forEach((repo, index) => {
+        const repoData = result.data[`repo${index}`];
 
-        if (existingCommitIndex >= 0) {
-          // Update existing commit
-          data.commits[existingCommitIndex] = commitData;
-        } else {
-          // Add new commit
-          newCommits.push(commitData);
+        if (!repoData) {
+          console.log(`Repository not found: ${repo.owner}/${repo.name}`);
+          return;
         }
-      }
-    });
+
+        if (repoData.latestRelease) {
+          const release = repoData.latestRelease;
+
+          const releaseData = {
+            id: randomUUID(),
+            repoId: repo.id,
+            repoOwner: repo.owner,
+            repoName: repo.name,
+            tagName: release.tagName,
+            name: release.name || release.tagName,
+            publishedAt: release.publishedAt,
+            htmlUrl: release.url,
+            body: release.description || '',
+            fetchedAt: new Date().toISOString()
+          };
+
+          const existingIndex = data.releases.findIndex(
+            (r) => r.repoId === repo.id && r.tagName === release.tagName
+          );
+
+          if (existingIndex >= 0) {
+            data.releases[existingIndex] = releaseData;
+          } else {
+            newReleases.push(releaseData);
+          }
+        } else {
+          console.log(`No releases found for ${repo.owner}/${repo.name}`);
+        }
+
+        if (repoData.defaultBranchRef?.target) {
+          const commit = repoData.defaultBranchRef.target;
+
+          const commitData = {
+            id: randomUUID(),
+            repoId: repo.id,
+            repoOwner: repo.owner,
+            repoName: repo.name,
+            sha: commit.oid,
+            message: commit.message,
+            date: commit.committedDate,
+            author: commit.author.name,
+            htmlUrl: commit.url,
+            fetchedAt: new Date().toISOString()
+          };
+
+          const existingCommitIndex = data.commits.findIndex(
+            (c) => c.repoId === repo.id
+          );
+
+          if (existingCommitIndex >= 0) {
+            data.commits[existingCommitIndex] = commitData;
+          } else {
+            newCommits.push(commitData);
+          }
+        }
+      });
+    } // end batch loop
 
     // Add new releases and commits to data
     data.releases.push(...newReleases);
