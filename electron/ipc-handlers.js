@@ -1,7 +1,7 @@
 import { dialog, app } from 'electron';
 import fs from 'fs/promises';
 import path from 'path';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -53,6 +53,41 @@ async function saveData(data) {
   await ensureDataDirectory();
   const dataPath = getDataFilePath();
   await fs.writeFile(dataPath, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+// Pages to Check that are seeded the very first time the feature exists.
+// Seeding only happens when `data.pages` is undefined (i.e. never initialized),
+// so a page the user later removes is never silently re-added.
+const SEED_PAGES = [
+  { url: 'https://arctic-labs.com/p/pie-access', title: 'arctic-labs.com/p/pie-access' }
+];
+
+function createSeededPages() {
+  return SEED_PAGES.map((p) => ({
+    id: randomUUID(),
+    url: p.url,
+    title: p.title,
+    addedAt: new Date().toISOString(),
+    contentHash: null,
+    contentLength: null,
+    lastChecked: null,
+    lastChanged: null,
+    changed: false,
+    status: 'pending',
+    error: null
+  }));
+}
+
+// Ensure data.pages exists. Returns true when it was just seeded (caller may persist).
+function ensurePagesInitialized(data) {
+  if (data.pages === undefined) {
+    data.pages = createSeededPages();
+    return true;
+  }
+  if (!Array.isArray(data.pages)) {
+    data.pages = [];
+  }
+  return false;
 }
 
 // Load settings from JSON file
@@ -968,6 +1003,198 @@ async function fetchReposFromUrl(event, url) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Pages to Check (non-GitHub pages watched for changes)
+// ---------------------------------------------------------------------------
+
+const PAGE_FETCH_TIMEOUT_MS = 15000;
+
+// Normalize HTML so noisy-but-meaningless changes don't register as edits.
+// Strips <script>/<style>/comments and collapses whitespace, keeping the rest
+// of the markup so content AND structural changes are still detected.
+function normalizeHtml(html) {
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hashContent(text) {
+  return createHash('sha256').update(text).digest('hex');
+}
+
+function extractTitle(html) {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (!match) return null;
+  const title = match[1].replace(/\s+/g, ' ').trim();
+  return title || null;
+}
+
+// Fetch a page and return a content snapshot { hash, length, title }.
+async function fetchPageSnapshot(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PAGE_FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ReleaseTracker',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText || ''}`.trim());
+    }
+
+    const html = await response.text();
+    const normalized = normalizeHtml(html);
+
+    return {
+      hash: hashContent(normalized),
+      length: normalized.length,
+      title: extractTitle(html)
+    };
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('Request timed out');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// IPC Handler: Get all tracked pages
+async function getPages() {
+  const data = await loadData();
+  const seeded = ensurePagesInitialized(data);
+  // Persist the seed once so page ids are stable across loads.
+  if (seeded) {
+    await saveData(data);
+  }
+  return data.pages;
+}
+
+// IPC Handler: Add a page to check
+async function addPage(event, rawUrl) {
+  const data = await loadData();
+  ensurePagesInitialized(data);
+
+  let url = (rawUrl || '').trim();
+  if (!url) {
+    throw new Error('Please enter a URL');
+  }
+  // Add a scheme if the user omitted it.
+  if (!/^https?:\/\//i.test(url)) {
+    url = 'https://' + url.replace(/^\/+/, '');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error('Please enter a valid URL');
+  }
+  url = parsed.toString();
+
+  const exists = data.pages.find((p) => p.url.toLowerCase() === url.toLowerCase());
+  if (exists) {
+    throw new Error('Page already tracked');
+  }
+
+  const now = new Date().toISOString();
+  let snapshot = null;
+  let status = 'pending';
+  let error = null;
+  let title = (parsed.hostname + parsed.pathname).replace(/\/$/, '');
+
+  // Capture an initial baseline snapshot so the next refresh can compare.
+  try {
+    snapshot = await fetchPageSnapshot(url);
+    if (snapshot.title) title = snapshot.title;
+    status = 'ok';
+  } catch (err) {
+    status = 'error';
+    error = err instanceof Error ? err.message : String(err);
+  }
+
+  const newPage = {
+    id: randomUUID(),
+    url,
+    title,
+    addedAt: now,
+    contentHash: snapshot ? snapshot.hash : null,
+    contentLength: snapshot ? snapshot.length : null,
+    lastChecked: snapshot ? now : null,
+    lastChanged: null,
+    changed: false,
+    status,
+    error
+  };
+
+  data.pages.push(newPage);
+  await saveData(data);
+
+  return newPage;
+}
+
+// IPC Handler: Remove a page
+async function removePage(event, id) {
+  const data = await loadData();
+  ensurePagesInitialized(data);
+  data.pages = data.pages.filter((p) => p.id !== id);
+  await saveData(data);
+}
+
+// IPC Handler: Re-check all pages and flag the ones that changed since last time
+async function checkPages() {
+  const data = await loadData();
+  ensurePagesInitialized(data);
+
+  const checked = await Promise.all(
+    data.pages.map(async (page) => {
+      const now = new Date().toISOString();
+
+      try {
+        const snapshot = await fetchPageSnapshot(page.url);
+        const hadBaseline = !!page.contentHash;
+        const changed = hadBaseline && snapshot.hash !== page.contentHash;
+
+        return {
+          ...page,
+          title: snapshot.title || page.title || page.url,
+          contentHash: snapshot.hash,
+          contentLength: snapshot.length,
+          lastChecked: now,
+          lastChanged: changed ? now : page.lastChanged,
+          changed,
+          status: 'ok',
+          error: null
+        };
+      } catch (err) {
+        return {
+          ...page,
+          lastChecked: now,
+          changed: false,
+          status: 'error',
+          error: err instanceof Error ? err.message : String(err)
+        };
+      }
+    })
+  );
+
+  data.pages = checked;
+  await saveData(data);
+
+  return data.pages;
+}
+
 export {
   selectFolder,
   scanFolder,
@@ -995,5 +1222,9 @@ export {
   directoryExists,
   cloneRepo,
   fetchUserRepos,
-  fetchReposFromUrl
+  fetchReposFromUrl,
+  getPages,
+  addPage,
+  removePage,
+  checkPages
 };

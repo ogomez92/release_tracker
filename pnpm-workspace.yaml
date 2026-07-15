@@ -1,0 +1,6 @@
+# pnpm v11+ replaced onlyBuiltDependencies/ignoredBuiltDependencies with this
+# allowBuilds map. Each listed package is a trusted, expected build script for
+# this Electron app, so its dependency build scripts are permitted explicitly.
+allowBuilds:
+  esbuild: true # native binary used by the Vite/Svelte build + test pipeline
+  electron: true # downloads the Electron runtime so the app can launch

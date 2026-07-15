@@ -102,6 +102,12 @@ function createWindow() {
   ipcMain.handle('fetch-user-repos', handlers.fetchUserRepos);
   ipcMain.handle('fetch-repos-from-url', handlers.fetchReposFromUrl);
 
+  // Pages to Check handlers
+  ipcMain.handle('get-pages', handlers.getPages);
+  ipcMain.handle('add-page', handlers.addPage);
+  ipcMain.handle('remove-page', handlers.removePage);
+  ipcMain.handle('check-pages', handlers.checkPages);
+
   // Open external links in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://') || url.startsWith('https://')) {

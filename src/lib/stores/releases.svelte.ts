@@ -1,9 +1,10 @@
-import type { TrackedRepo, Release, ScannedGitRepo, StoredCommit } from '$lib/types';
+import type { TrackedRepo, Release, ScannedGitRepo, StoredCommit, TrackedPage } from '$lib/types';
 
 class ReleasesStore {
 	repos = $state<TrackedRepo[]>([]);
 	releases = $state<Release[]>([]);
 	commits = $state<StoredCommit[]>([]);
+	pages = $state<TrackedPage[]>([]);
 	loading = $state(false);
 	error = $state<string | null>(null);
 	scanning = $state(false);
@@ -15,6 +16,7 @@ class ReleasesStore {
 			this.loadRepos();
 			this.loadStoredReleases();
 			this.loadStoredCommits();
+			this.loadPages();
 		}
 	}
 
@@ -144,6 +146,55 @@ class ReleasesStore {
 			console.error('Error fetching releases:', err);
 		} finally {
 			this.loading = false;
+		}
+
+		// Re-check watched pages for modifications. Kept separate so a page
+		// network error never wipes out the freshly-fetched releases.
+		try {
+			this.pages = await window.electronAPI.checkPages();
+		} catch (err) {
+			console.error('Error checking pages:', err);
+		}
+	}
+
+	async loadPages() {
+		if (!window.electronAPI) return;
+
+		try {
+			this.pages = await window.electronAPI.getPages();
+		} catch (err) {
+			console.error('Error loading pages:', err);
+		}
+	}
+
+	async addPage(url: string) {
+		if (!window.electronAPI) return;
+
+		try {
+			this.loading = true;
+			this.error = null;
+			const newPage = await window.electronAPI.addPage(url);
+			this.pages = [...this.pages, newPage];
+			return newPage;
+		} catch (err) {
+			this.error = err instanceof Error ? err.message : 'Failed to add page';
+			console.error('Error adding page:', err);
+			throw err;
+		} finally {
+			this.loading = false;
+		}
+	}
+
+	async removePage(id: string) {
+		if (!window.electronAPI) return;
+
+		try {
+			this.error = null;
+			await window.electronAPI.removePage(id);
+			this.pages = this.pages.filter((page) => page.id !== id);
+		} catch (err) {
+			this.error = err instanceof Error ? err.message : 'Failed to remove page';
+			console.error('Error removing page:', err);
 		}
 	}
 

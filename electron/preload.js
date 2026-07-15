@@ -44,5 +44,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Add by username/URL
   fetchUserRepos: (username) => ipcRenderer.invoke('fetch-user-repos', username),
-  fetchReposFromUrl: (url) => ipcRenderer.invoke('fetch-repos-from-url', url)
+  fetchReposFromUrl: (url) => ipcRenderer.invoke('fetch-repos-from-url', url),
+
+  // Pages to Check (non-GitHub pages watched for changes)
+  getPages: () => ipcRenderer.invoke('get-pages'),
+  addPage: (url) => ipcRenderer.invoke('add-page', url),
+  removePage: (id) => ipcRenderer.invoke('remove-page', id),
+  checkPages: () => ipcRenderer.invoke('check-pages')
 });

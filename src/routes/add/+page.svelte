@@ -4,6 +4,7 @@
 	import AddManual from '$lib/components/AddManual.svelte';
 	import AddByUsername from '$lib/components/AddByUsername.svelte';
 	import AddByUrl from '$lib/components/AddByUrl.svelte';
+	import AddPage from '$lib/components/AddPage.svelte';
 	import { onMount } from 'svelte';
 
 	onMount(() => {
@@ -70,6 +71,8 @@
 	<AddByUsername />
 	<AddByUrl />
 </div>
+
+<AddPage />
 
 <style>
 	h2 {

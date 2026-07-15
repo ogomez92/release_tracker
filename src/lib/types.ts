@@ -134,6 +134,23 @@ export interface ParsedRepo {
 	url: string;
 }
 
+// Non-GitHub page being watched for changes ("Pages to Check")
+export type PageCheckStatus = 'ok' | 'error' | 'pending';
+
+export interface TrackedPage {
+	id: string;
+	url: string;
+	title: string;
+	addedAt: string;
+	contentHash: string | null;
+	contentLength: number | null;
+	lastChecked: string | null;
+	lastChanged: string | null;
+	changed: boolean;
+	status: PageCheckStatus;
+	error: string | null;
+}
+
 // Electron API exposed via preload script
 export interface ElectronAPI {
 	selectFolder: () => Promise<string | null>;
@@ -165,6 +182,11 @@ export interface ElectronAPI {
 	// Add by username/URL methods
 	fetchUserRepos: (username: string) => Promise<GitHubUserRepo[]>;
 	fetchReposFromUrl: (url: string) => Promise<ParsedRepo[]>;
+	// Pages to Check (non-GitHub pages watched for changes)
+	getPages: () => Promise<TrackedPage[]>;
+	addPage: (url: string) => Promise<TrackedPage>;
+	removePage: (id: string) => Promise<void>;
+	checkPages: () => Promise<TrackedPage[]>;
 }
 
 // Global window interface extension for TypeScript

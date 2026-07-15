@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { releasesStore } from '$lib/stores/releases.svelte';
 	import ReleaseList from '$lib/components/ReleaseList.svelte';
+	import PageCheckList from '$lib/components/PageCheckList.svelte';
 	import { onMount } from 'svelte';
 	import type { LastCommit, TrackedRepo } from '$lib/types';
 
@@ -47,14 +48,20 @@
 			const repoCount = releasesStore.repos.length;
 			const reposWithoutReleasesCount = reposWithoutReleases.length;
 
-			if (releaseCount === 0 && reposWithoutReleasesCount === 0) {
-				liveMessage = 'Refresh complete. No repositories tracked.';
+			if (repoCount === 0) {
+				liveMessage = 'Refresh complete.';
 			} else if (releaseCount === 0) {
 				liveMessage = `Refresh complete. No releases found for ${repoCount} ${repoCount === 1 ? 'repository' : 'repositories'}.`;
 			} else if (reposWithoutReleasesCount > 0) {
 				liveMessage = `Refresh complete. Found ${releaseCount} ${releaseCount === 1 ? 'release' : 'releases'} from ${repoCount - reposWithoutReleasesCount} ${repoCount - reposWithoutReleasesCount === 1 ? 'repository' : 'repositories'}. ${reposWithoutReleasesCount} ${reposWithoutReleasesCount === 1 ? 'repository has' : 'repositories have'} no releases.`;
 			} else {
 				liveMessage = `Refresh complete. Found ${releaseCount} ${releaseCount === 1 ? 'release' : 'releases'} from ${repoCount} ${repoCount === 1 ? 'repository' : 'repositories'}.`;
+			}
+
+			// Announce watched-page changes too.
+			const changedPages = releasesStore.pages.filter((p) => p.changed).length;
+			if (changedPages > 0) {
+				liveMessage += ` ${changedPages} watched ${changedPages === 1 ? 'page' : 'pages'} changed since the last check.`;
 			}
 		} catch (error) {
 			liveMessage = 'Refresh failed. Please try again.';
@@ -133,15 +140,25 @@
 	{liveMessage}
 </div>
 
-{#if releasesStore.repos.length === 0}
+{#if releasesStore.repos.length === 0 && releasesStore.pages.length === 0}
 	<div class="empty-state">
-		<p>You haven't added any repositories yet.</p>
+		<p>You haven't added any repositories or pages yet.</p>
 		<p>
 			<a href="/add">Go to Add Repositories</a> to start tracking releases.
 		</p>
 	</div>
 {:else}
-	<ReleaseList releases={releasesStore.releases} />
+	{#if releasesStore.repos.length > 0}
+		<ReleaseList releases={releasesStore.releases} />
+	{:else}
+		<p class="no-repos-note">
+			No repositories tracked yet. <a href="/add">Add some</a> to track releases.
+		</p>
+	{/if}
+
+	{#if releasesStore.pages.length > 0}
+		<PageCheckList pages={releasesStore.pages} />
+	{/if}
 
 	{#if reposWithoutReleases.length > 0}
 		<section class="repos-without-releases">
@@ -292,6 +309,14 @@
 
 	.empty-state p {
 		margin-bottom: var(--spacing-md);
+	}
+
+	.no-repos-note {
+		padding: var(--spacing-md);
+		color: var(--color-text-secondary);
+		background-color: var(--color-bg-secondary);
+		border: 1px solid var(--color-border);
+		border-radius: var(--border-radius);
 	}
 
 	.empty-state a {
